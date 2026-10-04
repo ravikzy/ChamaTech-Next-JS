@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/*
+  VivaTech — identidade visual "confiança digital": verde esmeralda fechado
+  sobre um quase-preto com fundo verde-petróleo (não preto puro), âmbar
+  como segunda temperatura pra não ficar monocromático. Cards são
+  superfícies escuras (não mais o "papel de OS" da versão anterior) —
+  dark theme de verdade, não um shell escuro com cartões claros por cima.
+*/
+@theme {
+  --color-ink: #edf3ef;         /* texto claro (era texto escuro sobre papel) */
+  --color-paper: #152119;       /* superfície dos cards (era papel kraft claro) */
+  --color-paper-soft: #1c2b23;  /* superfície secundária, levemente mais clara */
+  --color-workbench: #0d1512;   /* fundo da página */
+  --color-workbench-soft: #16211c; /* hover sobre o fundo */
+  --color-copper: #34a374;      /* verde principal (era cobre) */
+  --color-copper-light: #4cc08d;
+  --color-amber: #e3b23c;       /* âmbar — segunda cor, urgência/CTA */
+  --color-circuit: #2db894;     /* verde-azulado — estados de sucesso/verificado */
+  --color-danger: #d65a4a;
+  --color-cream: #edf3ef;       /* texto claro sobre o fundo escuro */
+
+  --font-display: var(--font-bricolage), ui-sans-serif, sans-serif;
+  --font-mono-os: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --font-body: var(--font-instrument-sans), ui-sans-serif, sans-serif;
+}
+
+body {
+  background-color: var(--color-workbench);
+  color: var(--color-cream);
+  font-family: var(--font-body);
+}
+
+/* Textura sutil de trilhas de circuito no fundo escuro. */
+.workbench-texture {
+  background-image:
+    linear-gradient(var(--color-workbench-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-workbench-soft) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: -1px -1px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+.protocol-tag {
+  font-family: var(--font-mono-os);
+  letter-spacing: 0.04em;
+}
+
+.tear-line {
+  border-top: 1px solid color-mix(in srgb, var(--color-cream) 12%, transparent);
+}
+
+/* Indicador de disponibilidade ao vivo — a assinatura visual do site.
+   Bolinha verde com pulso sutil, usada onde quer que se comunique
+   "tem gente disponível agora" (hero, cards de técnico). */
+.status-pulse {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--color-copper-light);
+  flex-shrink: 0;
+}
+.status-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  background: var(--color-copper-light);
+  opacity: 0.35;
+  animation: status-pulse-ring 2s ease-out infinite;
+}
+@keyframes status-pulse-ring {
+  0% { transform: scale(0.6); opacity: 0.45; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status-pulse::after { animation: none; opacity: 0.2; }
+}
