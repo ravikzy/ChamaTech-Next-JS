@@ -24,7 +24,7 @@ export default async function TecnicosPendentes() {
     <div className="space-y-3">
       {rows.length === 0 && (
         <Card>
-          <p className="text-sm text-ink/70">Nenhum técnico aguardando verificação.</p>
+          <p className="text-sm text-ink/75">Nenhum técnico aguardando verificação.</p>
         </Card>
       )}
       {rows.map((t) => (
@@ -35,18 +35,18 @@ export default async function TecnicosPendentes() {
                 <h2 className="font-display">{t.name}</h2>
                 <Badge tone="en_route">Pendente</Badge>
               </div>
-              <p className="text-xs text-ink/60 mt-1">
+              <p className="text-xs text-ink/75 mt-1">
                 {t.email}
                 {t.phone ? ` · ${t.phone}` : ""}
               </p>
               <p className="text-sm text-ink/80 mt-3">
-                {t.bio || <span className="text-ink/40">Sem bio preenchida.</span>}
+                {t.bio || <span className="text-ink/75">Sem bio preenchida.</span>}
               </p>
-              {t.address && <p className="text-xs text-ink/50 mt-1">{t.address}</p>}
-              <p className="text-xs text-ink/50 mt-2">
+              {t.address && <p className="text-xs text-ink/75 mt-1">{t.address}</p>}
+              <p className="text-xs text-ink/75 mt-2">
                 {t.especialidades.length > 0 ? t.especialidades.join(" · ") : "Nenhuma especialidade escolhida"}
               </p>
-              <p className="text-xs text-ink/40 mt-1">Cadastro em {formatDateBR(t.created_at)}</p>
+              <p className="text-xs text-ink/75 mt-1">Cadastro em {formatDateBR(t.created_at)}</p>
             </div>
 
             <div className="flex flex-wrap gap-3 shrink-0">

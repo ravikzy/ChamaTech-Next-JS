@@ -11,7 +11,7 @@ export default async function PainelRedirecionamento() {
   const byRole = {
     client: "/painel",
     technician: "/painel-tecnico",
-    admin: "/usuarios",
+    admin: "/painel-admin",
   };
   redirect(byRole[session.user.role] || "/login");
 }

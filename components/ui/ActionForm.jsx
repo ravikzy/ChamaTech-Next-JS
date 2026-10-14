@@ -1,12 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 
 
 export function ActionForm({ action, className, children }) {
   const [state, formAction] = useActionState(action, null);
+  const showToast = useToast();
+
+  useEffect(() => {
+    if (state?.ok) showToast(state.ok);
+  }, [state, showToast]);
 
   return (
     <form action={formAction} className={className}>
@@ -14,11 +20,6 @@ export function ActionForm({ action, className, children }) {
       {state?.error && (
         <p role="alert" className="text-sm text-danger mt-3">
           {state.error}
-        </p>
-      )}
-      {state?.ok && (
-        <p role="status" className="text-sm text-circuit mt-3">
-          {state.ok}
         </p>
       )}
     </form>

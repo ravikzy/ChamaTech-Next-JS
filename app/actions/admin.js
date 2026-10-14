@@ -1,12 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSession, isUuid } from "@/lib/session";
+import { z } from "zod";
+import { getSession } from "@/lib/session";
 import { withTransaction } from "@/lib/db";
 import { criarNotificacao } from "@/lib/notifications";
 import { ErroDeRegra } from "@/lib/services";
+import { registrarAuditoria } from "@/lib/audit";
+import { moderarAvaliacao } from "@/lib/services";
+import { enviarEmailEvento } from "@/lib/email";
 
 const ERRO_GENERICO = "Não foi possível concluir a ação. Tente novamente.";
+const TechnicianIdSchema = z.string().trim().min(1, "Técnico inválido.").max(128, "Técnico inválido.");
+const DisputeUpdateSchema = z.object({
+  dispute_id: z.string().uuid("Disputa inválida."),
+  status: z.enum(["reviewing", "resolved", "dismissed"], { errorMap: () => ({ message: "Escolha um status válido." }) }),
+  resolution_notes: z.string().trim().max(1000, "As notas podem ter no máximo 1000 caracteres."),
+});
+const ReviewModerationSchema = z.object({
+  report_id: z.string().uuid("Denúncia inválida."),
+  decision: z.enum(["hide", "keep"]),
+});
 
 async function adminLogado() {
   const session = await getSession();
@@ -23,8 +37,9 @@ export async function verificarTecnico(_prev, formData) {
   const admin = await adminLogado();
   if (!admin) return { error: "Apenas administradores podem fazer isso." };
 
-  const technicianId = formData.get("technician_id");
-  if (typeof technicianId !== "string" || !technicianId) return { error: "Técnico inválido." };
+  const parsedId = TechnicianIdSchema.safeParse(formData.get("technician_id"));
+  if (!parsedId.success) return { error: parsedId.error.issues[0].message };
+  const technicianId = parsedId.data;
 
   try {
     await withTransaction(async (db) => {
@@ -37,6 +52,11 @@ export async function verificarTecnico(_prev, formData) {
         userId: technicianId,
         title: "Cadastro verificado",
         body: "Seu cadastro foi aprovado. Complete o perfil e ative a disponibilidade para receber chamados.",
+      });
+      await registrarAuditoria(db, {
+        actorId: admin.id,
+        action: "technician_verified",
+        targetId: technicianId,
       });
     });
     atualizarTelas();
@@ -56,8 +76,9 @@ export async function recusarTecnico(_prev, formData) {
   const admin = await adminLogado();
   if (!admin) return { error: "Apenas administradores podem fazer isso." };
 
-  const technicianId = formData.get("technician_id");
-  if (typeof technicianId !== "string" || !technicianId) return { error: "Técnico inválido." };
+  const parsedId = TechnicianIdSchema.safeParse(formData.get("technician_id"));
+  if (!parsedId.success) return { error: parsedId.error.issues[0].message };
+  const technicianId = parsedId.data;
 
   try {
     await withTransaction(async (db) => {
@@ -85,6 +106,12 @@ export async function recusarTecnico(_prev, formData) {
         title: "Cadastro de técnico não aprovado",
         body: "Seu cadastro de técnico não foi aprovado. Você continua com acesso como cliente.",
       });
+      await registrarAuditoria(db, {
+        actorId: admin.id,
+        action: "technician_rejected",
+        targetId: technicianId,
+        details: { fromRole: "technician", toRole: "client" },
+      });
     });
     atualizarTelas();
     return { ok: "Cadastro recusado. A conta voltou a ser de cliente." };
@@ -95,7 +122,6 @@ export async function recusarTecnico(_prev, formData) {
   }
 }
 
-const STATUS_DISPUTA = ["reviewing", "resolved", "dismissed"];
 const ROTULO_DISPUTA = {
   reviewing: "em análise",
   resolved: "resolvida",
@@ -107,13 +133,13 @@ export async function atualizarDisputa(_prev, formData) {
   const admin = await adminLogado();
   if (!admin) return { error: "Apenas administradores podem fazer isso." };
 
-  const disputeId = formData.get("dispute_id");
-  const status = formData.get("status");
-  const notas = String(formData.get("resolution_notes") ?? "").trim();
-
-  if (!isUuid(disputeId)) return { error: "Disputa inválida." };
-  if (!STATUS_DISPUTA.includes(status)) return { error: "Escolha um status válido." };
-  if (notas.length > 1000) return { error: "As notas podem ter no máximo 1000 caracteres." };
+  const parsed = DisputeUpdateSchema.safeParse({
+    dispute_id: formData.get("dispute_id"),
+    status: formData.get("status"),
+    resolution_notes: formData.get("resolution_notes") ?? "",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { dispute_id: disputeId, status, resolution_notes: notas } = parsed.data;
 
   const encerrando = status === "resolved" || status === "dismissed";
   if (encerrando && notas.length < 3) {
@@ -121,6 +147,7 @@ export async function atualizarDisputa(_prev, formData) {
   }
 
   try {
+    let emailRecipients = [];
     await withTransaction(async (db) => {
       const { rows } = await db.query(
         `update disputes
@@ -133,17 +160,68 @@ export async function atualizarDisputa(_prev, formData) {
       );
       if (rows.length !== 1) throw new ErroDeRegra(404, "Disputa não encontrada.");
 
+      const { rows: parties } = await db.query(
+        `select sv.id, sv.protocol, sv.client_id, sv.technician_id
+           from services sv where sv.id = $1`,
+        [rows[0].service_id]
+      );
+      const service = parties[0];
+      emailRecipients = [service.client_id, service.technician_id].filter(Boolean).map((userId) => ({
+        userId,
+        href: userId === service.client_id ? `/chamados/${service.id}` : `/meus-chamados/${service.id}`,
+        protocol: service.protocol,
+      }));
+
       await criarNotificacao(db, {
         userId: rows[0].opened_by,
         title: `Sua disputa está ${ROTULO_DISPUTA[status]}`,
         body: notas || "Um administrador está analisando o caso.",
+        href: emailRecipients.find(({ userId }) => userId === rows[0].opened_by)?.href ?? "/notificacoes",
+      });
+      await registrarAuditoria(db, {
+        actorId: admin.id,
+        action: encerrando ? "dispute_resolved" : "dispute_status_changed",
+        targetId: disputeId,
+        details: { status },
       });
     });
+    if (encerrando) {
+      await Promise.all(emailRecipients.map(({ userId, href, protocol }) => enviarEmailEvento({
+        userId,
+        subject: `Disputa ${status === "resolved" ? "resolvida" : "arquivada"} · ${protocol}`,
+        text: notas || "A equipe atualizou a disputa do chamado.",
+        href,
+      })));
+    }
     atualizarTelas();
     return { ok: "Disputa atualizada." };
   } catch (err) {
     if (err instanceof ErroDeRegra) return { error: err.message };
     console.error("atualizarDisputa:", err);
+    return { error: ERRO_GENERICO };
+  }
+}
+
+export async function moderarAvaliacaoAction(_prev, formData) {
+  const admin = await adminLogado();
+  if (!admin) return { error: "Apenas administradores podem fazer isso." };
+
+  const parsed = ReviewModerationSchema.safeParse({
+    report_id: formData.get("report_id"),
+    decision: formData.get("decision"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  try {
+    const result = await moderarAvaliacao(admin, {
+      reportId: parsed.data.report_id,
+      decision: parsed.data.decision,
+    });
+    if (!result.ok) return { error: result.error };
+    atualizarTelas();
+    return { ok: parsed.data.decision === "hide" ? "Avaliação ocultada." : "Denúncia arquivada; avaliação mantida." };
+  } catch (error) {
+    console.error("moderarAvaliacaoAction:", error);
     return { error: ERRO_GENERICO };
   }
 }

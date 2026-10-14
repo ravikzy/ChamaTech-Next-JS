@@ -12,9 +12,10 @@ export function Button({ variant = "primary", className, as: Tag = "button", ...
   return (
     <Tag
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5",
+        "inline-flex items-center justify-center gap-2 rounded-control px-5 py-2.5",
         "font-display text-sm font-semibold",
         "transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-workbench",
         VARIANTS[variant],
         className
       )}

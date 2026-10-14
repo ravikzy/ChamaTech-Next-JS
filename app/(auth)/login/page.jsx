@@ -27,7 +27,17 @@ function LoginForm() {
 
     setLoading(false);
     if (signInError) {
-      setError("E-mail ou senha incorretos.");
+      setError("Não foi possível entrar. Confira seus dados; se a conta ainda não foi confirmada, um novo link será enviado.");
+      return;
+    }
+    if (params.get("perfil") === "tecnico") {
+      const response = await fetch("/api/tornar-tecnico", { method: "POST" });
+      if (!response.ok) {
+        setLoading(false);
+        setError("Não foi possível configurar o perfil técnico. Confirme o e-mail e tente novamente.");
+        return;
+      }
+      router.push("/painel-tecnico");
       return;
     }
     // Só aceita caminhos internos (evita redirecionar para sites externos).
@@ -39,9 +49,9 @@ function LoginForm() {
   return (
     <Card className="w-full max-w-sm">
       <h1 className="font-display text-xl mb-1">Entrar</h1>
-      <p className="text-sm text-ink/60 mb-6">Acesse sua conta para acompanhar chamados.</p>
+      <p className="text-sm text-ink/75 mb-6">Acesse sua conta para acompanhar chamados.</p>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form method="post" onSubmit={handleSubmit} className="space-y-4">
         <Input id="email" name="email" type="email" label="E-mail" required />
         <Input id="password" name="password" type="password" label="Senha" required />
         {error && <p className="text-sm text-danger">{error}</p>}
@@ -50,7 +60,11 @@ function LoginForm() {
         </Button>
       </form>
 
-      <p className="text-sm text-ink/60 mt-5">
+      <p className="text-sm mt-4">
+        <Link href="/esqueci-senha" className="text-copper underline">Esqueci minha senha</Link>
+      </p>
+
+      <p className="text-sm text-ink/75 mt-5">
         Não tem conta?{" "}
         <Link href="/cadastro" className="text-copper underline">
           Cadastre-se

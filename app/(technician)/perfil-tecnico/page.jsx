@@ -10,11 +10,12 @@ export default async function PerfilTecnico() {
   const session = await requireRole("technician");
   const userId = session.user.id;
 
-  const [{ rows: perfilRows }, { rows: todas }, { rows: minhas }] = await Promise.all([
+  const [{ rows: perfilRows }, { rows: userRows }, { rows: todas }, { rows: minhas }] = await Promise.all([
     query(
       `select bio, address, latitude, longitude, is_verified from technicians where user_id = $1`,
       [userId]
     ),
+    query(`select email_notifications from "user" where id = $1`, [userId]),
     query(`select id, name from specialties order by name`),
     query(`select specialty_id from technician_specialties where technician_id = $1`, [userId]),
   ]);
@@ -28,7 +29,7 @@ export default async function PerfilTecnico() {
         <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
           <div>
             <p className="font-display text-sm">{session.user.name}</p>
-            <p className="text-xs text-ink/50">{session.user.email}</p>
+            <p className="text-xs text-ink/75">{session.user.email}</p>
           </div>
           <Badge tone={perfil.is_verified ? "completed" : "en_route"}>
             {perfil.is_verified ? "Verificado" : "Em verificação"}
@@ -37,7 +38,7 @@ export default async function PerfilTecnico() {
 
         <ActionForm action={salvarPerfilTecnico} className="space-y-5">
           <label className="block">
-            <span className="block text-xs uppercase tracking-wide text-cream/50 font-display font-semibold mb-1.5">
+            <span className="block text-xs uppercase tracking-wide text-cream/75 font-display font-semibold mb-1.5">
               Bio
             </span>
             <textarea
@@ -46,7 +47,7 @@ export default async function PerfilTecnico() {
               maxLength={500}
               defaultValue={perfil.bio ?? ""}
               placeholder="Conte sua experiência e o tipo de atendimento que você faz."
-              className="w-full rounded-lg border border-cream/15 bg-workbench px-3 py-2.5 text-cream placeholder:text-cream/25 focus:outline-none focus:ring-2 focus:ring-copper focus:border-copper/50"
+              className="w-full rounded-lg border border-cream/15 bg-workbench px-3 py-2.5 text-cream placeholder:text-cream/75 focus:outline-none focus:ring-2 focus:ring-copper focus:border-copper/50"
             />
           </label>
 
@@ -70,13 +71,13 @@ export default async function PerfilTecnico() {
               defaultValue={perfil.longitude ?? ""}
             />
           </div>
-          <p className="text-xs text-cream/50 -mt-2">
+          <p className="text-xs text-cream/75 -mt-2">
             As coordenadas são usadas para calcular a distância até o cliente. Dica: no Google Maps, clique
             com o botão direito no seu local e copie os números.
           </p>
 
           <fieldset>
-            <legend className="block text-xs uppercase tracking-wide text-cream/50 font-display font-semibold mb-2">
+            <legend className="block text-xs uppercase tracking-wide text-cream/75 font-display font-semibold mb-2">
               Especialidades
             </legend>
             <div className="grid sm:grid-cols-2 gap-2">
@@ -97,6 +98,11 @@ export default async function PerfilTecnico() {
               ))}
             </div>
           </fieldset>
+
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" name="email_notifications" defaultChecked={userRows[0]?.email_notifications !== false} className="mt-1 accent-[var(--color-copper)]" />
+            <span>Receber por e-mail atualizações importantes sobre meus chamados</span>
+          </label>
 
           <SubmitButton pendingText="Salvando...">Salvar perfil</SubmitButton>
         </ActionForm>

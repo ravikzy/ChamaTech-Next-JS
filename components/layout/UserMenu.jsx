@@ -51,7 +51,7 @@ export function UserMenu({ user, dark = false }) {
         <div className="absolute right-0 mt-2 w-52 bg-paper text-ink rounded-lg border border-cream/10 shadow-xl overflow-hidden z-50">
           <div className="px-4 py-3 border-b border-cream/10">
             <p className="text-sm font-medium truncate">{user.name}</p>
-            <p className="text-xs text-ink/50">{ROLE_LABEL[user.role] || user.role}</p>
+            <p className="text-xs text-ink/75">{ROLE_LABEL[user.role] || user.role}</p>
           </div>
           {PERFIL_HREF[user.role] && (
             <Link

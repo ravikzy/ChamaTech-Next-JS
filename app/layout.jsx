@@ -1,5 +1,6 @@
 import { Bricolage_Grotesque, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/components/ui/Toast";
 
 // Títulos
 const bricolage = Bricolage_Grotesque({
@@ -23,14 +24,14 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata = {
-  title: "VivaTech",
-  description: "Assistência técnica sob demanda — técnicos verificados, perto de você.",
+  title: { default: "ChamaTech", template: "%s | ChamaTech" },
+  description: "Conecte-se a profissionais de TI verificados e acompanhe cada etapa do atendimento no ChamaTech.",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR" className={`${bricolage.variable} ${jetbrainsMono.variable} ${instrumentSans.variable}`}>
-      <body>{children}</body>
+      <body><ToastProvider>{children}</ToastProvider></body>
     </html>
   );
 }

@@ -2,11 +2,14 @@ import { notFound } from "next/navigation";
 import { requireRole, isUuid } from "@/lib/session";
 import { query } from "@/lib/db";
 import { Card, ProtocolBadge } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, StatusBadge } from "@/components/ui/Badge";
 import { ActionForm, SubmitButton } from "@/components/ui/ActionForm";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import Link from "next/link";
+import { rotulosDasTags } from "@/lib/reviews";
 import { cancelarChamado, abrirDisputa, avaliarChamado } from "@/app/actions/cliente";
-import { STATUS_LABELS, formatDateBR, formatBRL } from "@/lib/utils";
+import { STATUS_LABELS, formatDateBR, formatBRL, whatsappHref } from "@/lib/utils";
+import { ChatPanel } from "@/components/service/ChatPanel";
 
 const PODE_CANCELAR = ["pending", "accepted", "en_route"];
 
@@ -24,7 +27,7 @@ export default async function DetalheChamado({ params }) {
 
   // Só o cliente dono do chamado enxerga: qualquer outro caso vira "não encontrado".
   const { rows } = await query(
-    `select sv.*, u.name as technician_name
+    `select sv.*, u.name as technician_name, u.phone as technician_phone
        from services sv
        left join "user" u on u.id = sv.technician_id
       where sv.id = $1 and sv.client_id = $2`,
@@ -32,6 +35,7 @@ export default async function DetalheChamado({ params }) {
   );
   const chamado = rows[0];
   if (!chamado) notFound();
+  const whatsapp = chamado.accepted_at ? whatsappHref(chamado.technician_phone) : null;
 
   const [{ rows: historico }, { rows: avaliacao }, { rows: disputas }] = await Promise.all([
     query(
@@ -39,7 +43,7 @@ export default async function DetalheChamado({ params }) {
         where service_id = $1 order by changed_at asc`,
       [id]
     ),
-    query(`select rating, comment from reviews where service_id = $1`, [id]),
+    query(`select rating, comment, tags, technician_reply, is_hidden from reviews where service_id = $1`, [id]),
     query(
       `select reason, status, resolution_notes, created_at from disputes
         where service_id = $1 order by created_at desc`,
@@ -67,22 +71,27 @@ export default async function DetalheChamado({ params }) {
                 <ProtocolBadge protocol={chamado.protocol} />
                 {chamado.is_emergency && <Badge tone="disputed">Emergência</Badge>}
               </div>
-              <Badge tone={chamado.status}>{STATUS_LABELS[chamado.status]}</Badge>
+              <StatusBadge status={chamado.status} />
             </div>
             <p className="mt-4 text-sm whitespace-pre-line">{chamado.description}</p>
-            {chamado.address && <p className="text-xs text-ink/50 mt-3">Endereço: {chamado.address}</p>}
+            {chamado.address && <p className="text-xs text-ink/75 mt-3">Endereço: {chamado.address}</p>}
             {chamado.technician_name ? (
-              <p className="text-xs text-ink/50 mt-1">Técnico: {chamado.technician_name}</p>
+              <p className="text-xs text-ink/75 mt-1">Técnico: {chamado.technician_name}</p>
             ) : (
-              <p className="text-xs text-ink/50 mt-1">Aguardando um técnico aceitar.</p>
+              <p className="text-xs text-ink/75 mt-1">Aguardando um técnico aceitar.</p>
+            )}
+            {whatsapp && (
+              <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="inline-flex mt-3 rounded-control bg-circuit px-4 py-2 text-sm font-semibold text-workbench focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                Conversar pelo WhatsApp
+              </a>
             )}
 
-            <h2 className="font-display font-semibold text-sm mt-8 mb-3 text-ink/60">Histórico</h2>
+            <h2 className="font-display font-semibold text-sm mt-8 mb-3 text-ink/75">Histórico</h2>
             <ol className="space-y-2 text-sm">
               {historico.map((h, i) => (
                 <li key={i} className="flex justify-between gap-4 border-t border-ink/10 pt-2">
                   <span>{STATUS_LABELS[h.status]}</span>
-                  <span className="text-ink/50">{formatDateBR(h.changed_at)}</span>
+                  <span className="text-ink/75">{formatDateBR(h.changed_at)}</span>
                 </li>
               ))}
             </ol>
@@ -96,11 +105,11 @@ export default async function DetalheChamado({ params }) {
                   <div key={i} className="text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <Badge tone="disputed">{STATUS_DISPUTA[d.status] ?? d.status}</Badge>
-                      <span className="text-xs text-ink/50">{formatDateBR(d.created_at)}</span>
+                      <span className="text-xs text-ink/75">{formatDateBR(d.created_at)}</span>
                     </div>
                     <p className="mt-2 whitespace-pre-line">{d.reason}</p>
                     {d.resolution_notes && (
-                      <p className="mt-2 text-ink/70">
+                      <p className="mt-2 text-ink/75">
                         <span className="font-medium">Resposta da equipe:</span> {d.resolution_notes}
                       </p>
                     )}
@@ -112,9 +121,19 @@ export default async function DetalheChamado({ params }) {
 
           {chamado.status === "completed" && jaAvaliou && (
             <Card>
-              <h2 className="font-display font-semibold text-sm mb-2">Sua avaliação</h2>
-              <p className="text-amber">{"★".repeat(avaliacao[0].rating)}</p>
-              {avaliacao[0].comment && <p className="text-sm text-ink/70 mt-1">{avaliacao[0].comment}</p>}
+              <div className="flex items-center gap-2">
+                <h2 className="font-display font-semibold text-sm">Sua avaliação</h2>
+                {avaliacao[0].is_hidden && <Badge tone="disputed">Ocultada pela moderação</Badge>}
+              </div>
+              <p className="text-amber mt-2">{"★".repeat(avaliacao[0].rating)}</p>
+              {avaliacao[0].comment && <p className="text-sm text-ink/75 mt-1">{avaliacao[0].comment}</p>}
+              {avaliacao[0].tags?.length > 0 && <p className="text-xs text-ink/75 mt-2">{rotulosDasTags(avaliacao[0].tags).join(" · ")}</p>}
+              {avaliacao[0].technician_reply && (
+                <p className="text-sm border-l-2 border-copper pl-3 mt-4">
+                  <span className="block text-xs text-ink/75 mb-1">Resposta do técnico</span>
+                  {avaliacao[0].technician_reply}
+                </p>
+              )}
             </Card>
           )}
 
@@ -124,7 +143,7 @@ export default async function DetalheChamado({ params }) {
               <ActionForm action={avaliarChamado} className="space-y-3">
                 <input type="hidden" name="service_id" value={chamado.id} />
                 <fieldset>
-                  <legend className="text-xs uppercase tracking-wide text-cream/50 font-display font-semibold mb-2">
+                  <legend className="text-xs uppercase tracking-wide text-cream/75 font-display font-semibold mb-2">
                     Nota
                   </legend>
                   <div className="flex gap-2">
@@ -144,8 +163,24 @@ export default async function DetalheChamado({ params }) {
                   rows={3}
                   maxLength={500}
                   placeholder="Conte como foi o atendimento (opcional)"
-                  className="w-full rounded-lg border border-cream/15 bg-workbench px-3 py-2.5 text-sm text-cream placeholder:text-cream/25 focus:outline-none focus:ring-2 focus:ring-copper"
+                  className="w-full rounded-lg border border-cream/15 bg-workbench px-3 py-2.5 text-sm text-cream placeholder:text-cream/75 focus:outline-none focus:ring-2 focus:ring-copper"
                 />
+                <fieldset>
+                  <legend className="text-xs font-semibold mb-2">O que se destacou? (opcional)</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      ["pontual", "Pontual"],
+                      ["educado", "Educado"],
+                      ["resolveu", "Resolveu o problema"],
+                      ["bom_preco", "Bom preço"],
+                    ].map(([value, label]) => (
+                      <label key={value} className="flex items-center gap-2 rounded-full border border-cream/20 px-3 py-1.5 text-xs has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus">
+                        <input type="checkbox" name="tags" value={value} className="accent-[var(--color-copper)]" />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
                 <SubmitButton pendingText="Enviando...">Enviar avaliação</SubmitButton>
               </ActionForm>
             </Card>
@@ -158,7 +193,7 @@ export default async function DetalheChamado({ params }) {
             <p className="text-2xl font-display font-bold">
               {chamado.price != null ? formatBRL(chamado.price) : "A combinar"}
             </p>
-            <p className="text-xs text-ink/50 mt-1">Aberto em {formatDateBR(chamado.requested_at)}</p>
+            <p className="text-xs text-ink/75 mt-1">Aberto em {formatDateBR(chamado.requested_at)}</p>
           </Card>
 
           {PODE_CANCELAR.includes(chamado.status) && (
@@ -185,8 +220,9 @@ export default async function DetalheChamado({ params }) {
                   maxLength={1000}
                   rows={3}
                   placeholder="Explique o motivo da disputa"
-                  className="w-full rounded-lg border border-cream/15 bg-workbench px-3 py-2.5 text-sm text-cream placeholder:text-cream/25 focus:outline-none focus:ring-2 focus:ring-copper"
+                  className="w-full rounded-lg border border-cream/15 bg-workbench px-3 py-2.5 text-sm text-cream placeholder:text-cream/75 focus:outline-none focus:ring-2 focus:ring-copper"
                 />
+                <Link href="/ajuda#disputas" className="block text-sm text-copper-light underline underline-offset-4">Como funciona uma disputa?</Link>
                 <SubmitButton variant="outline" pendingText="Enviando...">
                   Abrir disputa
                 </SubmitButton>
@@ -195,6 +231,7 @@ export default async function DetalheChamado({ params }) {
           )}
         </div>
       </div>
+      {chamado.accepted_at && <div className="mt-6"><ChatPanel serviceId={chamado.id} userId={session.user.id} /></div>}
     </div>
   );
 }

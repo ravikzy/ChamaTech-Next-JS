@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn, STATUS_LABELS } from "@/lib/utils";
 
 const TONES = {
   pending: "bg-cream/10 text-cream border-cream/30",
@@ -21,4 +21,10 @@ export function Badge({ tone = "pending", children }) {
       {children}
     </span>
   );
+}
+
+export function StatusBadge({ status }) {
+  const label = STATUS_LABELS[status];
+  if (!label) return null;
+  return <Badge tone={status}>{label}</Badge>;
 }

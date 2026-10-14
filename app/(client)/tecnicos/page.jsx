@@ -5,12 +5,14 @@ import { query } from "@/lib/db";
 import { buscarTecnicos } from "@/lib/technicians";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/PageStates";
 import { cn } from "@/lib/utils";
 
 export default async function BuscaTecnicos({ searchParams }) {
   const params = await searchParams;
   const emergencia = params?.emergencia === "1";
   const especialidade = typeof params?.especialidade === "string" ? params.especialidade : undefined;
+  const ordenar = params?.ordenar === "nota" ? "nota" : "proximidade";
 
   const session = await requireRole("client");
   const [{ rows: clienteRows }, { rows: especialidades }] = await Promise.all([
@@ -23,6 +25,7 @@ export default async function BuscaTecnicos({ searchParams }) {
     lat: local?.latitude ?? undefined,
     lng: local?.longitude ?? undefined,
     especialidade,
+    ordenar,
   });
 
   // Mantém o modo emergência ao trocar de filtro.
@@ -30,8 +33,16 @@ export default async function BuscaTecnicos({ searchParams }) {
     const q = new URLSearchParams();
     if (emergencia) q.set("emergencia", "1");
     if (slug) q.set("especialidade", slug);
+    if (ordenar !== "proximidade") q.set("ordenar", ordenar);
     const texto = q.toString();
     return texto ? `/tecnicos?${texto}` : "/tecnicos";
+  }
+  function hrefOrdenar(value) {
+    const q = new URLSearchParams();
+    if (emergencia) q.set("emergencia", "1");
+    if (especialidade) q.set("especialidade", especialidade);
+    if (value !== "proximidade") q.set("ordenar", value);
+    return q.size ? `/tecnicos?${q.toString()}` : "/tecnicos";
   }
   const sufixoPerfil = emergencia ? "?emergencia=1" : "";
 
@@ -42,7 +53,7 @@ export default async function BuscaTecnicos({ searchParams }) {
           <Zap className="w-5 h-5 text-amber shrink-0 mt-0.5" />
           <div>
             <p className="font-display text-sm">Modo emergência</p>
-            <p className="text-sm text-ink/70 mt-1">
+            <p className="text-sm text-ink/75 mt-1">
               Mostrando primeiro os técnicos disponíveis agora e mais próximos de você. O chamado
               já vai marcado como emergência.
             </p>
@@ -78,12 +89,27 @@ export default async function BuscaTecnicos({ searchParams }) {
         ))}
       </div>
 
+      <nav aria-label="Ordenar técnicos" className="flex flex-wrap items-center gap-2 text-sm">
+        <span>Ordenar por:</span>
+        <Link href={hrefOrdenar("proximidade")} aria-current={ordenar === "proximidade" ? "page" : undefined}
+          className={ordenar === "proximidade" ? "rounded-full bg-copper px-3 py-1.5 text-white" : "rounded-full border border-cream/20 px-3 py-1.5 text-cream/80 hover:bg-workbench-soft"}>
+          Proximidade
+        </Link>
+        <Link href={hrefOrdenar("nota")} aria-current={ordenar === "nota" ? "page" : undefined}
+          className={ordenar === "nota" ? "rounded-full bg-copper px-3 py-1.5 text-white" : "rounded-full border border-cream/20 px-3 py-1.5 text-cream/80 hover:bg-workbench-soft"}>
+          Nota
+        </Link>
+      </nav>
+
       {tecnicos.length === 0 && (
-        <Card>
-          <p className="text-sm text-ink/70">
-            Nenhum técnico disponível {especialidade ? "nesta especialidade " : ""}agora. Tente novamente em instantes.
-          </p>
-        </Card>
+        <EmptyState
+          title="Nenhum técnico disponível agora"
+          description={especialidade
+            ? "Não encontramos profissionais nesta especialidade. Remova o filtro ou tente novamente mais tarde."
+            : "Não encontramos profissionais disponíveis perto de você. Tente novamente mais tarde."}
+          href={especialidade ? hrefFiltro() : "/cadastro?perfil=tecnico"}
+          actionLabel={especialidade ? "Ver todas as especialidades" : "Cadastrar como técnico"}
+        />
       )}
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -98,17 +124,19 @@ export default async function BuscaTecnicos({ searchParams }) {
               <div className="flex items-center justify-between gap-2">
                 <h3 className="font-display">{t.name}</h3>
                 <Badge tone="completed">
-                  ★ {Number(t.total_reviews) > 0 ? Number(t.average_rating).toFixed(1) : "Novo"}
+                  {Number(t.total_reviews) >= 3
+                    ? `★ ${Number(t.average_rating).toFixed(1)} · ${t.total_reviews} avaliações`
+                    : "Novo"}
                 </Badge>
               </div>
               <p className="flex items-center gap-1.5 text-xs text-circuit mt-2">
                 <span className="status-pulse" /> Disponível agora
               </p>
-              <p className="text-sm text-ink/70 mt-2 line-clamp-2">{t.bio}</p>
+              <p className="text-sm text-ink/75 mt-2 line-clamp-2">{t.bio}</p>
               {t.especialidades?.length > 0 && (
-                <p className="text-xs text-ink/50 mt-2 line-clamp-1">{t.especialidades.join(" · ")}</p>
+                <p className="text-xs text-ink/75 mt-2 line-clamp-1">{t.especialidades.join(" · ")}</p>
               )}
-              <p className="text-xs text-ink/50 mt-3">
+              <p className="text-xs text-ink/75 mt-3">
                 {t.distancia_km != null ? `${Number(t.distancia_km).toFixed(1)} km de distância` : ""}
               </p>
             </Card>

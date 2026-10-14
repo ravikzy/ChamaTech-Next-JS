@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { NAV_BY_ROLE, TITLE_BY_ROLE } from "@/lib/nav";
 import { marcarComoLida, marcarTodasComoLidas } from "@/app/actions/notificacoes";
 import { formatDateBR } from "@/lib/utils";
+import Link from "next/link";
 
 // Fora dos grupos de rota porque serve aos três papéis: monta o painel
 // certo (menu e título) a partir do papel da sessão.
@@ -18,7 +19,7 @@ export default async function Notificacoes() {
   if (!NAV_BY_ROLE[role]) redirect("/login");
 
   const { rows } = await query(
-    `select id, title, body, read, created_at from notifications
+    `select id, title, body, href, read, created_at from notifications
       where user_id = $1 order by created_at desc limit 50`,
     [session.user.id]
   );
@@ -42,7 +43,7 @@ export default async function Notificacoes() {
 
         {rows.length === 0 && (
           <Card>
-            <p className="text-sm text-ink/70">Você não tem notificações.</p>
+            <p className="text-sm text-ink/75">Você não tem notificações.</p>
           </Card>
         )}
 
@@ -52,10 +53,11 @@ export default async function Notificacoes() {
               <div className="min-w-0">
                 <p className="font-display text-sm">
                   {!n.read && <span className="inline-block w-2 h-2 rounded-full bg-amber mr-2" aria-label="Não lida" />}
-                  {n.title}
+                  {n.href ? <Link href={n.href} className="hover:underline underline-offset-4">{n.title}</Link> : n.title}
                 </p>
-                {n.body && <p className="text-sm text-ink/70 mt-1">{n.body}</p>}
-                <p className="text-xs text-ink/40 mt-2">{formatDateBR(n.created_at)}</p>
+                {n.body && <p className="text-sm text-ink/75 mt-1">{n.body}</p>}
+                {n.href && <Link href={n.href} className="inline-block text-xs text-copper-light underline underline-offset-4 mt-2">Ver detalhes</Link>}
+                <p className="text-xs text-ink/75 mt-2">{formatDateBR(n.created_at)}</p>
               </div>
               {!n.read && (
                 <form action={marcarComoLida}>

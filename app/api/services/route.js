@@ -3,15 +3,20 @@ import { z } from "zod";
 import { query } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { criarChamado } from "@/lib/services";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const CreateServiceSchema = z.object({
-  technician_id: z.string().optional(),
-  specialty_id: z.number().optional(),
+  technician_id: z.string().trim().min(1).max(128).optional(),
+  specialty_id: z.number().int().positive().optional(),
   description: z.string().trim().min(10, "Descreva o problema com pelo menos 10 caracteres.").max(1000),
   is_emergency: z.boolean().optional(),
   address: z.string().trim().max(300).optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
+}).superRefine((data, context) => {
+  if ((data.latitude === undefined) !== (data.longitude === undefined)) {
+    context.addIssue({ code: "custom", path: ["latitude"], message: "Envie latitude e longitude juntas." });
+  }
 });
 
 // POST /api/services — cliente autenticado abre um chamado
@@ -31,6 +36,9 @@ export async function POST(request) {
   const parsed = CreateServiceSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
+  }
+  if (!checkRateLimit(`service:create:${session.user.id}`, 5, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
 
   const d = parsed.data;

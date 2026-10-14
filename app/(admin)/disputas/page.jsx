@@ -5,15 +5,16 @@ import { Badge } from "@/components/ui/Badge";
 import { ActionForm, SubmitButton } from "@/components/ui/ActionForm";
 import { atualizarDisputa } from "@/app/actions/admin";
 import { STATUS_LABELS, formatDateBR } from "@/lib/utils";
+import { AdminChatDisclosure } from "@/components/service/AdminChatDisclosure";
 
 const DISPUTE_TONE = { open: "disputed", reviewing: "en_route", resolved: "completed", dismissed: "cancelled" };
 const DISPUTE_LABEL = { open: "Aberta", reviewing: "Em análise", resolved: "Resolvida", dismissed: "Arquivada" };
 
 export default async function Disputas() {
-  await requireRole("admin");
+  const session = await requireRole("admin");
   const { rows } = await query(
     `select d.id, d.reason, d.status, d.resolution_notes, d.created_at, d.resolved_at,
-            sv.protocol, sv.status as service_status,
+            sv.id as service_id, sv.protocol, sv.status as service_status, sv.accepted_at,
             u.name as aberto_por, uc.name as cliente, ut.name as tecnico
        from disputes d
        join services sv on sv.id = d.service_id
@@ -27,7 +28,7 @@ export default async function Disputas() {
     <div className="space-y-3">
       {rows.length === 0 && (
         <Card>
-          <p className="text-sm text-ink/70">Nenhuma disputa registrada.</p>
+          <p className="text-sm text-ink/75">Nenhuma disputa registrada.</p>
         </Card>
       )}
       {rows.map((d) => (
@@ -39,24 +40,26 @@ export default async function Disputas() {
                 <Badge tone={d.service_status}>{STATUS_LABELS[d.service_status]}</Badge>
               </div>
               <p className="mt-2 text-sm whitespace-pre-line">{d.reason}</p>
-              <p className="text-xs text-ink/50 mt-1">
+              <p className="text-xs text-ink/75 mt-1">
                 Aberta por {d.aberto_por} · {formatDateBR(d.created_at)}
               </p>
-              <p className="text-xs text-ink/50">
+              <p className="text-xs text-ink/75">
                 Cliente: {d.cliente} · Técnico: {d.tecnico ?? "—"}
               </p>
               {d.resolved_at && (
-                <p className="text-xs text-ink/50">Encerrada em {formatDateBR(d.resolved_at)}</p>
+                <p className="text-xs text-ink/75">Encerrada em {formatDateBR(d.resolved_at)}</p>
               )}
             </div>
             <Badge tone={DISPUTE_TONE[d.status]}>{DISPUTE_LABEL[d.status] ?? d.status}</Badge>
           </div>
 
+          {d.accepted_at && <AdminChatDisclosure serviceId={d.service_id} userId={session.user.id} />}
+
           <ActionForm action={atualizarDisputa} className="mt-4 border-t border-ink/10 pt-4 space-y-3">
             <input type="hidden" name="dispute_id" value={d.id} />
             <div className="grid sm:grid-cols-[200px_1fr] gap-3">
               <label className="block">
-                <span className="block text-xs uppercase tracking-wide text-cream/50 font-display font-semibold mb-1.5">
+                <span className="block text-xs uppercase tracking-wide text-cream/75 font-display font-semibold mb-1.5">
                   Status
                 </span>
                 <select
@@ -70,7 +73,7 @@ export default async function Disputas() {
                 </select>
               </label>
               <label className="block">
-                <span className="block text-xs uppercase tracking-wide text-cream/50 font-display font-semibold mb-1.5">
+                <span className="block text-xs uppercase tracking-wide text-cream/75 font-display font-semibold mb-1.5">
                   Notas de resolução
                 </span>
                 <textarea
@@ -79,7 +82,7 @@ export default async function Disputas() {
                   maxLength={1000}
                   defaultValue={d.resolution_notes ?? ""}
                   placeholder="Obrigatório ao resolver ou arquivar"
-                  className="w-full rounded-lg border border-cream/15 bg-workbench px-3 py-2.5 text-sm text-cream placeholder:text-cream/25 focus:outline-none focus:ring-2 focus:ring-copper"
+                  className="w-full rounded-lg border border-cream/15 bg-workbench px-3 py-2.5 text-sm text-cream placeholder:text-cream/75 focus:outline-none focus:ring-2 focus:ring-copper"
                 />
               </label>
             </div>

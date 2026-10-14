@@ -2,18 +2,40 @@
 
 create extension if not exists pgcrypto; -- gen_random_uuid()
 
-create type service_status as enum (
-  'pending', 'accepted', 'en_route', 'in_progress',
-  'completed', 'cancelled', 'disputed'
+-- Registra o aceite de termos e privacidade no momento do cadastro.
+alter table "user" add column if not exists terms_accepted boolean not null default false;
+alter table "user" add column if not exists terms_accepted_at timestamptz;
+alter table "user" add column if not exists email_notifications boolean not null default true;
+
+create table if not exists admin_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_id text not null references "user"(id),
+  action text not null,
+  target_id text,
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
 );
 
-create type payment_status as enum ('pending', 'paid', 'refunded', 'failed');
-create type media_type as enum ('photo', 'video');
-create type dispute_status as enum ('open', 'reviewing', 'resolved', 'dismissed');
+create index if not exists idx_admin_audit_created_at on admin_audit_logs (created_at desc);
+
+do $$ begin
+  create type service_status as enum (
+    'pending', 'accepted', 'en_route', 'in_progress',
+    'completed', 'cancelled', 'disputed'
+  );
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin create type payment_status as enum ('pending', 'paid', 'refunded', 'failed');
+exception when duplicate_object then null; end $$;
+do $$ begin create type media_type as enum ('photo', 'video');
+exception when duplicate_object then null; end $$;
+do $$ begin create type dispute_status as enum ('open', 'reviewing', 'resolved', 'dismissed');
+exception when duplicate_object then null; end $$;
 
 
 
-create table clients (
+create table if not exists clients (
   user_id text primary key references "user"(id) on delete cascade,
   address text,
   latitude double precision,
@@ -21,7 +43,7 @@ create table clients (
   created_at timestamptz not null default now()
 );
 
-create table technicians (
+create table if not exists technicians (
   user_id text primary key references "user"(id) on delete cascade,
   bio text,
   average_rating numeric(3,2) not null default 0,
@@ -34,23 +56,23 @@ create table technicians (
   created_at timestamptz not null default now()
 );
 
-create index idx_technicians_available on technicians (is_available);
-create index idx_technicians_location on technicians (latitude, longitude);
+create index if not exists idx_technicians_available on technicians (is_available);
+create index if not exists idx_technicians_location on technicians (latitude, longitude);
 
-create table specialties (
+create table if not exists specialties (
   id serial primary key,
   name text unique not null,
   slug text unique not null
 );
 
-create table technician_specialties (
+create table if not exists technician_specialties (
   technician_id text references technicians(user_id) on delete cascade,
   specialty_id integer references specialties(id) on delete cascade,
   primary key (technician_id, specialty_id)
 );
 
 
-create table services (
+create table if not exists services (
   id uuid primary key default gen_random_uuid(),
   protocol text unique not null default (
     'OS-' || to_char(now(), 'YYYY') || '-' ||
@@ -73,12 +95,12 @@ create table services (
   longitude double precision
 );
 
-create index idx_services_client on services (client_id);
-create index idx_services_technician on services (technician_id, status);
-create index idx_services_status on services (status);
-create index idx_services_emergency on services (is_emergency) where is_emergency = true;
+create index if not exists idx_services_client on services (client_id);
+create index if not exists idx_services_technician on services (technician_id, status);
+create index if not exists idx_services_status on services (status);
+create index if not exists idx_services_emergency on services (is_emergency) where is_emergency = true;
 
-create table service_media (
+create table if not exists service_media (
   id uuid primary key default gen_random_uuid(),
   service_id uuid not null references services(id) on delete cascade,
   url text not null,
@@ -86,7 +108,7 @@ create table service_media (
   uploaded_at timestamptz not null default now()
 );
 
-create table service_status_history (
+create table if not exists service_status_history (
   id uuid primary key default gen_random_uuid(),
   service_id uuid not null references services(id) on delete cascade,
   status service_status not null,
@@ -94,20 +116,49 @@ create table service_status_history (
   changed_at timestamptz not null default now()
 );
 
-create table reviews (
+create table if not exists reviews (
   id uuid primary key default gen_random_uuid(),
   service_id uuid not null references services(id),
   client_id text not null references clients(user_id),
   technician_id text not null references technicians(user_id),
   rating smallint not null check (rating between 1 and 5),
   comment text,
+  tags text[] not null default '{}',
+  technician_reply text,
+  replied_at timestamptz,
+  is_hidden boolean not null default false,
+  hidden_by text references "user"(id),
+  hidden_at timestamptz,
   created_at timestamptz not null default now(),
   unique (service_id)
 );
 
-create index idx_reviews_technician on reviews (technician_id);
+-- Compatibilidade com instalações criadas antes das avaliações moderáveis.
+alter table reviews add column if not exists tags text[] not null default '{}';
+alter table reviews add column if not exists technician_reply text;
+alter table reviews add column if not exists replied_at timestamptz;
+alter table reviews add column if not exists is_hidden boolean not null default false;
+alter table reviews add column if not exists hidden_by text references "user"(id);
+alter table reviews add column if not exists hidden_at timestamptz;
 
-create table payments (
+create index if not exists idx_reviews_technician on reviews (technician_id);
+
+create table if not exists review_reports (
+  id uuid primary key default gen_random_uuid(),
+  review_id uuid not null references reviews(id) on delete cascade,
+  reporter_id text not null references "user"(id) on delete cascade,
+  reason text not null check (char_length(reason) between 5 and 500),
+  status text not null default 'open' check (status in ('open', 'resolved', 'dismissed')),
+  reviewed_by text references "user"(id),
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (review_id, reporter_id)
+);
+
+create index if not exists idx_review_reports_open on review_reports (created_at desc) where status = 'open';
+create index if not exists idx_reviews_public on reviews (technician_id, created_at desc) where is_hidden = false;
+
+create table if not exists payments (
   id uuid primary key default gen_random_uuid(),
   service_id uuid not null references services(id),
   amount numeric(10,2) not null,
@@ -118,7 +169,7 @@ create table payments (
   created_at timestamptz not null default now()
 );
 
-create table chats (
+create table if not exists chats (
   id uuid primary key default gen_random_uuid(),
   service_id uuid not null references services(id) on delete cascade,
   sender_id text not null references "user"(id),
@@ -127,9 +178,9 @@ create table chats (
   sent_at timestamptz not null default now()
 );
 
-create index idx_chats_service on chats (service_id, sent_at);
+create index if not exists idx_chats_service on chats (service_id, sent_at);
 
-create table disputes (
+create table if not exists disputes (
   id uuid primary key default gen_random_uuid(),
   service_id uuid not null references services(id),
   opened_by text not null references "user"(id),
@@ -140,16 +191,19 @@ create table disputes (
   resolved_at timestamptz
 );
 
-create table notifications (
+create table if not exists notifications (
   id uuid primary key default gen_random_uuid(),
   user_id text not null references "user"(id) on delete cascade,
   title text not null,
   body text,
+  href text,
   read boolean not null default false,
   created_at timestamptz not null default now()
 );
 
-create index idx_notifications_user on notifications (user_id, read);
+alter table notifications add column if not exists href text;
+
+create index if not exists idx_notifications_user on notifications (user_id, read);
 
 
 

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
-  VivaTech — identidade visual "confiança digital": verde esmeralda fechado
+  ChamaTech — identidade visual "confiança digital": verde esmeralda fechado
   sobre um quase-preto com fundo verde-petróleo (não preto puro), âmbar
   como segunda temperatura pra não ficar monocromático. Cards são
   superfícies escuras (não mais o "papel de OS" da versão anterior) —
@@ -18,6 +18,11 @@
   --color-amber: #e3b23c;       /* âmbar — segunda cor, urgência/CTA */
   --color-circuit: #2db894;     /* verde-azulado — estados de sucesso/verificado */
   --color-danger: #d65a4a;
+  --color-focus: #e3b23c;
+  --radius-control: 0.625rem;
+  --radius-card: 0.875rem;
+  --spacing-page: 1.5rem;
+  --shadow-card: 0 14px 36px rgb(0 0 0 / 18%);
   --color-cream: #edf3ef;       /* texto claro sobre o fundo escuro */
 
   --font-display: var(--font-bricolage), ui-sans-serif, sans-serif;
@@ -29,6 +34,11 @@ body {
   background-color: var(--color-workbench);
   color: var(--color-cream);
   font-family: var(--font-body);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
 }
 
 /* Textura sutil de trilhas de circuito no fundo escuro. */

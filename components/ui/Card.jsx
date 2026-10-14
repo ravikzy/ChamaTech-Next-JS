@@ -4,8 +4,7 @@ export function Card({ className, children, as: Tag = "div", ...props }) {
   return (
     <Tag
       className={cn(
-        "bg-paper text-ink rounded-lg border border-cream/8 relative overflow-hidden",
-        "before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-copper/40",
+        "bg-paper text-ink rounded-card border border-cream/10 shadow-card relative overflow-hidden",
         "p-5",
         className
       )}

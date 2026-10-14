@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/session";
 import { withTransaction } from "@/lib/db";
 import { ErroDeRegra } from "@/lib/services";
+import { registrarAuditoria } from "@/lib/audit";
 
 // POST /api/tornar-tecnico — promove a conta logada de "client" para "technician".
 // O cadastro sempre nasce como client; quando vem de /cadastro?perfil=tecnico,
@@ -11,6 +12,9 @@ export async function POST() {
   if (!session) {
     return Response.json({ error: "Não autenticado." }, { status: 401 });
   }
+  if (!session.user.emailVerified) {
+    return Response.json({ error: "Confirme seu e-mail antes de solicitar o perfil técnico." }, { status: 403 });
+  }
 
   try {
     await withTransaction(async (db) => {
@@ -19,6 +23,7 @@ export async function POST() {
         `select role from "user" where id = $1 for update`,
         [session.user.id]
       );
+      if (rows[0]?.role === "technician") return;
       if (rows[0]?.role !== "client") {
         throw new ErroDeRegra(400, "Conta não pode ser promovida.");
       }
@@ -45,6 +50,12 @@ export async function POST() {
          values ($1, false, false) on conflict do nothing`,
         [session.user.id]
       );
+      await registrarAuditoria(db, {
+        actorId: session.user.id,
+        action: "role_changed",
+        targetId: session.user.id,
+        details: { fromRole: "client", toRole: "technician" },
+      });
     });
 
     return Response.json({ ok: true });

@@ -5,6 +5,7 @@ import { getSessionCookie } from "better-auth/cookies";
 const PROTECTED_PREFIXES = [
   "/painel",
   "/painel-tecnico",
+  "/painel-admin",
   "/tecnicos",
   "/chamados",
   "/solicitacoes",
@@ -34,9 +35,11 @@ export async function middleware(request) {
 }
 
 export const config = {
+  runtime: "nodejs",
   matcher: [
     "/painel/:path*",
     "/painel-tecnico/:path*",
+    "/painel-admin/:path*",
     "/tecnicos/:path*",
     "/chamados/:path*",
     "/solicitacoes/:path*",

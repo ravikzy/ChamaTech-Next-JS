@@ -2,9 +2,9 @@ import Link from "next/link";
 import { requireRole } from "@/lib/session";
 import { query } from "@/lib/db";
 import { Card, ProtocolBadge } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, StatusBadge } from "@/components/ui/Badge";
 import { TecnicoAcoes } from "@/components/service/TecnicoAcoes";
-import { STATUS_LABELS, formatDateBR } from "@/lib/utils";
+import { formatDateBR } from "@/lib/utils";
 
 export default async function MeusChamados() {
   const session = await requireRole("technician");
@@ -27,7 +27,7 @@ export default async function MeusChamados() {
     <div className="space-y-3">
       {rows.length === 0 && (
         <Card>
-          <p className="text-sm text-ink/70">
+          <p className="text-sm text-ink/75">
             Você ainda não tem chamados. Veja as novas em <Link href="/solicitacoes" className="underline">Solicitações</Link>.
           </p>
         </Card>
@@ -39,10 +39,10 @@ export default async function MeusChamados() {
               <div className="flex flex-wrap items-center gap-2">
                 <ProtocolBadge protocol={c.protocol} />
                 {c.is_emergency && <Badge tone="disputed">Emergência</Badge>}
-                <Badge tone={c.status}>{STATUS_LABELS[c.status]}</Badge>
+                <StatusBadge status={c.status} />
               </div>
               <p className="mt-2 text-sm line-clamp-2">{c.description}</p>
-              <p className="text-xs text-ink/50 mt-1">
+              <p className="text-xs text-ink/75 mt-1">
                 Cliente: {c.client_name} · {formatDateBR(c.requested_at)}
               </p>
             </Link>

@@ -1,8 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSession, isUuid } from "@/lib/session";
+import { z } from "zod";
+import { getSession } from "@/lib/session";
 import { query } from "@/lib/db";
+
+const NotificationIdSchema = z.string().uuid();
 
 /** Marca uma notificação do usuário logado como lida. */
 export async function marcarComoLida(formData) {
@@ -10,9 +13,10 @@ export async function marcarComoLida(formData) {
   if (!session) return;
 
   const id = formData.get("id");
-  if (!isUuid(id)) return;
+  const parsedId = NotificationIdSchema.safeParse(id);
+  if (!parsedId.success) return;
 
-  await query(`update notifications set read = true where id = $1 and user_id = $2`, [id, session.user.id]);
+  await query(`update notifications set read = true where id = $1 and user_id = $2`, [parsedId.data, session.user.id]);
   revalidatePath("/", "layout");
 }
 

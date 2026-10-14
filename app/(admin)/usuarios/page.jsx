@@ -42,7 +42,7 @@ export default async function Usuarios({ searchParams }) {
             name="q"
             defaultValue={q}
             placeholder="Buscar por nome ou e-mail"
-            className="flex-1 rounded-lg border border-cream/15 bg-workbench px-3 py-2.5 text-sm text-cream placeholder:text-cream/25 focus:outline-none focus:ring-2 focus:ring-copper"
+            className="flex-1 rounded-lg border border-cream/15 bg-workbench px-3 py-2.5 text-sm text-cream placeholder:text-cream/75 focus:outline-none focus:ring-2 focus:ring-copper"
           />
           <select
             name="papel"
@@ -62,7 +62,7 @@ export default async function Usuarios({ searchParams }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[560px]">
             <thead>
-              <tr className="text-left text-ink/50 text-xs uppercase border-b border-ink/10">
+              <tr className="text-left text-ink/75 text-xs uppercase border-b border-ink/10">
                 <th className="pb-2">Nome</th>
                 <th className="pb-2">E-mail</th>
                 <th className="pb-2">Papel</th>
@@ -72,7 +72,7 @@ export default async function Usuarios({ searchParams }) {
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="py-4 text-ink/60">
+                  <td colSpan={4} className="py-4 text-ink/75">
                     Nenhum usuário encontrado.
                   </td>
                 </tr>
@@ -80,17 +80,17 @@ export default async function Usuarios({ searchParams }) {
               {rows.map((u) => (
                 <tr key={u.id} className="border-b border-ink/5">
                   <td className="py-2">{u.name}</td>
-                  <td className="py-2 text-ink/70">{u.email}</td>
+                  <td className="py-2 text-ink/75">{u.email}</td>
                   <td className="py-2">
                     <Badge tone={ROLE_TONE[u.role] || "pending"}>{ROLE_LABEL[u.role] || u.role}</Badge>
                   </td>
-                  <td className="py-2 text-ink/50">{formatDateBR(u.created_at)}</td>
+                  <td className="py-2 text-ink/75">{formatDateBR(u.created_at)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-ink/40 mt-3">Mostrando até 100 resultados, dos mais recentes.</p>
+        <p className="text-xs text-ink/75 mt-3">Mostrando até 100 resultados, dos mais recentes.</p>
       </Card>
     </div>
   );

@@ -4,8 +4,8 @@ import { getSession, isUuid } from "@/lib/session";
 import { aceitarServico, mudarStatusServico } from "@/lib/services";
 
 const UpdateSchema = z.object({
-  status: z.string(),
-  reason: z.string().optional(), // motivo — obrigatório ao abrir disputa
+  status: z.enum(["pending", "accepted", "en_route", "in_progress", "completed", "cancelled", "disputed"]),
+  reason: z.string().trim().max(1000).optional(), // motivo — obrigatório ao abrir disputa
 });
 
 // PATCH /api/services/:id — transição de status.
